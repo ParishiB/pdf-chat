@@ -1,22 +1,30 @@
 import { Worker, Queue } from "bullmq";
 import { Request, Response } from "express";
 import PDFParser from "pdf-parse";
-import fs from "fs";
+import IORedis from "ioredis";
 
-const pdfParsingQueue = new Queue("pdfParsingQueue");
-
-const worker = new Worker("pdfParsingQueue", async (job) => {
-  const { pdfBuffer } = job.data;
-
-  try {
-    const pdfData = await PDFParser(pdfBuffer);
-    const text = pdfData.text;
-    return text;
-  } catch (error) {
-    console.error("Error parsing PDF:", error);
-    throw error;
-  }
+const connection = new IORedis({
+  maxRetriesPerRequest: null,
 });
+
+const pdfParsingQueue = new Queue("pdfParsingQueue", { connection });
+
+const worker = new Worker(
+  "pdfParsingQueue",
+  async (job) => {
+    const { pdfBuffer } = job.data;
+
+    try {
+      const pdfData = await PDFParser(pdfBuffer);
+      const text = pdfData.text;
+      return text;
+    } catch (error) {
+      console.error("Error parsing PDF:", error);
+      throw error;
+    }
+  },
+  { connection }
+);
 
 worker.on("completed", (job) => {
   console.log(
