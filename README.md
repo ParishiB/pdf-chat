@@ -1,1 +1,1 @@
-** A Web App to Chat with PDFs
+ A Web App to Chat with PDFs
