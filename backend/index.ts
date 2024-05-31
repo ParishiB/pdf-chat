@@ -250,6 +250,9 @@ app.post("/ask", async (req: Request, res: Response) => {
       .json({ message: "Internal server error", error: error.message });
   }
 });
+app.post("/askQuestion", async (req: AskQuestionRequest, res: Response) => {
+  //cosine similarity
+}
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
