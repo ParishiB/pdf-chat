@@ -76,19 +76,6 @@ app.post(
   }
 );
 
-// async function processPDF(pdfUrl: any) {
-//   try {
-//     var externalURL = pdfUrl;
-
-//     fs.readFile(externalURL, function (err, data) {
-//       var fileData = new Buffer(data).toString("base64");
-//       console.log("the file content is:", fileData);
-//       return fileData;
-//     });
-//   } catch (error) {
-//     console.error("cannot read the pdf file");
-//   }
-// }
 async function processPDF(pdfUrl: string): Promise<string> {
   try {
     const response = await axios.get(pdfUrl, { responseType: "arraybuffer" });
@@ -135,4 +122,135 @@ app.post("/processFile", async (req: Request, res: Response) => {
   }
 });
 
-app.listen(4000);
+// app.post("/ask", async (req: Request, res: Response) => {
+//   try {
+//     const { question, id } = req.body;
+//     if (!question || !id) {
+//       return res
+//         .status(400)
+//         .json({ message: "Question and project ID are required" });
+//     }
+
+//     const project = await prisma.project.findUnique({
+//       where: { id },
+//     });
+
+//     if (!project || !project.embedding) {
+//       return res
+//         .status(400)
+//         .json({ message: "Project not found or embeddings missing" });
+//     }
+
+//     const embeddings = project.embedding;
+
+//     if (!embeddings) {
+//       return res
+//         .status(400)
+//         .json({ message: "Embeddings are missing or invalid" });
+//     }
+
+//     const prompt = `Given the following context extracted from the PDF document:\n\n${embeddings}\n\nAnswer the following question:\n\nQ: ${question}\nA:`;
+
+//     // const response = await axios.post(
+//     //   "https://api.openai.com/v1/completions",
+//     //   {
+//     //     model: "gpt-3.5-turbo",
+//     //     prompt: prompt,
+//     //     max_tokens: 500,
+//     //     temperature: 0.5,
+//     //   },
+//     //   {
+//     //     headers: {
+//     //       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+//     //     },
+//     //   }
+//     // );
+
+//     const response = await axios.post(
+//       "https://api.openai.com/v1/chat/completions",
+//       {
+//         model: "gpt-3.5-turbo",
+//         messages: [{ role: "user", content: `${prompt}` }],
+//       },
+//       {
+//         headers: {
+//           "Content-Type": "application/json",
+//           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+//         },
+//       }
+//     );
+
+//     const chatGptResponse = response.data.choices[0].message.content;
+
+//     console.log(chatGptResponse);
+//   } catch (error: any) {
+//     console.error("Error processing question:", error);
+//     console.error("Error message:", error.message);
+//     console.error("Error stack:", error.stack);
+//     console.error("Error response data:", error.response?.data);
+//     console.error("Error response status:", error.response?.status);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+
+app.post("/ask", async (req: Request, res: Response) => {
+  try {
+    const { question, id } = req.body;
+
+    if (!question || !id) {
+      return res
+        .status(400)
+        .json({ message: "Question and project ID are required" });
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id },
+    });
+
+    if (!project || !project.embedding) {
+      return res
+        .status(400)
+        .json({ message: "Project not found or embeddings missing" });
+    }
+
+    const embeddings = project.embedding;
+
+    if (!embeddings) {
+      return res
+        .status(400)
+        .json({ message: "Embeddings are missing or invalid" });
+    }
+
+    const prompt = `Given the following context extracted from the PDF document:\n\n${embeddings}\n\nAnswer the following question:\n\nQ: ${question}\nA:`;
+
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 300,
+        temperature: 0.5,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+      }
+    );
+
+    const chatGptResponse = response.data.choices[0].message.content;
+    console.log(chatGptResponse);
+
+    res.status(200).json({ answer: chatGptResponse });
+  } catch (error: any) {
+    console.error("Error processing question:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
