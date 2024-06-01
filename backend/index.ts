@@ -250,9 +250,80 @@ app.post("/ask", async (req: Request, res: Response) => {
       .json({ message: "Internal server error", error: error.message });
   }
 });
-app.post("/askQuestion", async (req: AskQuestionRequest, res: Response) => {
-  //cosine similarity
+
+app.post("/askQuestion", async (req: Request, res: Response) => {
+  try {
+    const { id, question } = req.body;
+
+    const project = await prisma.project.findFirst({
+      where: { id },
+    });
+
+    if (!project) {
+      return res.status(400).json({ message: "Project not found" });
+    }
+
+    const questionEmbedding = await getEmbeddings(question);
+    const answerEmbedding = project.embedding;
+
+    const similarity = calculateSimilarity(questionEmbedding, answerEmbedding);
+    const relevantAnswers = await getRelevantAnswers(question);
+
+    res.json({ message: "Question answered", relevantAnswers });
+  } catch (error) {
+    console.error("Error asking questions", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+
+// Function to calculate cosine similarity
+function calculateSimilarity(vector1: number[], vector2: number[]): number {
+  const dotProduct = vector1.reduce((sum, val, i) => sum + val * vector2[i], 0);
+  const magnitude1 = Math.sqrt(vector1.reduce((sum, val) => sum + val ** 2, 0));
+  const magnitude2 = Math.sqrt(vector2.reduce((sum, val) => sum + val ** 2, 0));
+  return dotProduct / (magnitude1 * magnitude2);
 }
+
+// Function to get relevant answers
+async function getRelevantAnswers(question: string): Promise<any> {
+  const vectors = await getVectors(question);
+
+  if (!vectors.length) {
+    return [];
+  }
+
+  const relevantAnswers = [];
+
+  for (const vector of vectors) {
+    const similarity = calculateSimilarity(vector.vector, [1, 2, 3, 4, 5]); // Replace with your question vector
+    relevantAnswers.push({ vector, similarity });
+  }
+
+  relevantAnswers.sort((a, b) => b.similarity - a.similarity);
+
+  return relevantAnswers.slice(0, 5); // Return top 5 most similar vectors
+}
+
+// Function to get vectors from PostgreSQL
+async function getVectors(question: string): Promise<any> {
+  const query = {
+    text: `SELECT * FROM vectors WHERE vector @> $1`,
+    values: [question],
+  };
+
+  try {
+    const result = await prisma.$queryRaw(query);
+    return result;
+  } catch (error) {
+    console.error("Error getting vectors:", error);
+    return [];
+  }
+}
+
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
